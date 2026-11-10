@@ -1,0 +1,11 @@
+{
+  "submissions": [
+    {
+      "id": "mwa2e0uze3u0",
+      "name": "Ada Lovelace",
+      "email": "ada@example.com",
+      "message": "Hello from the test",
+      "createdAt": "2026-11-10T02:22:00.155Z"
+    }
+  ]
+}

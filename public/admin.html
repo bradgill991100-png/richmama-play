@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin Panel — RichMama Clone</title>
+<style>
+  :root { --gold:#f5c518; --dark:#12141c; --card:#1d2030; --muted:#9aa0b4; --text:#f4f5f8; --green:#2ecc71; --red:#ff5c5c; --border:#2a2e42; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--dark); color:var(--text); min-height:100vh; }
+  header { display:flex; align-items:center; justify-content:space-between; padding:16px 28px; border-bottom:1px solid var(--border); }
+  .logo { font-weight:800; font-size:1.2rem; } .logo span{color:var(--gold);}
+  .actions { display:flex; gap:10px; }
+  .btn { background:var(--gold); color:#111; border:none; padding:9px 18px; border-radius:7px; font-weight:700; cursor:pointer; font-size:.9rem; }
+  .btn:hover { background:#d4a012; }
+  .btn.ghost { background:transparent; color:var(--muted); border:1px solid var(--border); }
+  .btn.danger { background:var(--red); color:#fff; }
+  .wrap { max-width:960px; margin:28px auto; padding:0 20px; }
+
+  /* Login */
+  #login { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:70vh; }
+  #login .box { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:32px; width:100%; max-width:360px; display:grid; gap:14px; }
+  #login h1 { font-size:1.3rem; text-align:center; }
+  input { width:100%; padding:12px 14px; border-radius:8px; border:1px solid #333952; background:#141724; color:var(--text); font-size:.95rem; }
+  input:focus { outline:2px solid var(--gold); border-color:transparent; }
+  .hint { color:var(--muted); font-size:.82rem; text-align:center; }
+
+  /* Table */
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:12px 14px; border-bottom:1px solid var(--border); font-size:.92rem; }
+  th { color:var(--muted); font-size:.8rem; text-transform:uppercase; letter-spacing:.5px; }
+  tr:hover td { background:#20243a; }
+  td.name { font-weight:600; }
+  td .del { background:none; border:1px solid var(--red); color:var(--red); padding:5px 12px; border-radius:6px; cursor:pointer; font-size:.82rem; }
+  td .del:hover { background:var(--red); color:#fff; }
+  .empty { text-align:center; color:var(--muted); padding:40px 0; }
+  .count { color:var(--muted); font-size:.85rem; margin-bottom:14px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Rich<span>Mama</span> &middot; Admin</div>
+  <div class="actions" id="actions" style="display:none">
+    <button class="btn ghost" id="refresh">Refresh</button>
+    <button class="btn danger" id="clear">Clear all</button>
+    <a class="btn ghost" href="/" style="text-decoration:none;display:inline-block">Site</a>
+    <button class="btn ghost" id="logout">Log out</button>
+  </div>
+</header>
+
+<!-- Login -->
+<div id="login">
+  <div class="box">
+    <h1>Admin login</h1>
+    <input type="password" id="pw" placeholder="Password" autofocus>
+    <button class="btn" id="login-btn">Log in</button>
+    <div class="hint">Default password: <b>admin123</b></div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div class="wrap" id="dash" style="display:none">
+  <div class="count" id="count"></div>
+  <table>
+    <thead><tr><th>Name</th><th>Email</th><th>Message</th><th>Date</th><th></th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="empty" id="empty" style="display:none">No submissions yet.</div>
+</div>
+
+<script>
+let auth = sessionStorage.getItem('auth') || '';
+const $ = id => document.getElementById(id);
+
+function showApp() {
+  $('login').style.display = 'none';
+  $('dash').style.display = 'block';
+  $('actions').style.display = 'flex';
+  load();
+}
+function showLogin() {
+  $('dash').style.display = 'none';
+  $('actions').style.display = 'none';
+  $('login').style.display = 'flex';
+  $('pw').value = '';
+  $('pw').focus();
+}
+
+async function api(url, opts) {
+  opts = opts || {};
+  opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+  if (auth) opts.headers['Authorization'] = 'Bearer ' + auth;
+  return fetch(url, opts);
+}
+
+function esc(s){ return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+async function load() {
+  const res = await api('/api/admin/submissions');
+  if (res.status === 401) return showLogin();
+  const { submissions } = await res.json();
+  const rows = $('rows'); rows.innerHTML = '';
+  submissions.forEach(s => {
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td class="name">' + esc(s.name) + '</td>' +
+      '<td>' + esc(s.email) + '</td>' +
+      '<td>' + esc(s.message) + '</td>' +
+      '<td>' + new Date(s.createdAt).toLocaleString() + '</td>' +
+      '<td><button class="del" data-id="' + s.id + '">Delete</button></td>';
+    rows.appendChild(tr);
+  });
+  $('empty').style.display = submissions.length ? 'none' : 'block';
+  $('count').textContent = submissions.length + ' submission' + (submissions.length === 1 ? '' : 's');
+}
+
+$('login-btn').onclick = async () => {
+  const res = await fetch('/api/admin/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: $('pw').value })
+  });
+  if (res.ok) { auth = $('pw').value; sessionStorage.setItem('auth', auth); showApp(); }
+  else $('pw').value = '', $('pw').placeholder = 'Wrong password — try again', $('pw').focus();
+};
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') $('login-btn').click(); });
+$('refresh').onclick = load;
+$('logout').onclick = () => { auth = ''; sessionStorage.removeItem('auth'); showLogin(); };
+$('clear').onclick = async () => {
+  if (!confirm('Delete ALL submissions?')) return;
+  await api('/api/admin/clear', { method: 'POST' }); load();
+};
+$('rows').addEventListener('click', async e => {
+  const btn = e.target.closest('.del'); if (!btn) return;
+  if (!confirm('Delete this submission?')) return;
+  await api('/api/admin/submissions/' + btn.dataset.id, { method: 'DELETE' }); load();
+});
+
+// Boot
+if (auth) {
+  api('/api/admin/submissions').then(r => r.status === 401 ? showLogin() : showApp());
+} else showLogin();
+</script>
+</body>
+</html>
